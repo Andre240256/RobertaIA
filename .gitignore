@@ -1,0 +1,18 @@
+.venv/
+
+# not utilized data and files
+data/
+logcolector.py
+
+# learning gymnasium API
+gymnasium_train/ 
+
+# papers referenced in 'relatorio'
+referencias/
+
+# latex 'trash'
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.synctex.gz

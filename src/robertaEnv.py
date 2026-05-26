@@ -1,4 +1,5 @@
 import numpy as np
+import math
 
 import gymnasium as gym
 from gymnasium import logger, spaces
@@ -10,23 +11,27 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
 
     metadata = {
         "render_modes":["human", "rgb_array"],
-        "render_fps": 50,
+        "render_fps": 120,
     }
 
     def __init__(self, render_mode: str | None = None):
 
         self._gravity = 9.8
-        self._tau = 0.1
-        self._throttle_converter = 100
+        self._tau = 0.001
+        self._throttle_converter = 12.25
+        self._setpoint = 0.0
+        self._equilibrium = 0.0
 
         self._mass_arm = 1.0
         self._length_arm = 0.4
         self._inertia_momentum = (self._mass_arm * self._length_arm ** 2)/3
 
-        self.kinematics_integrator = "euler"
+        self.kinematics_integrator = ""
+        self._steps = 0
         
-        self._max_angle = 45
-        self._min_angle = -52
+
+        self._max_angle = 45.0 * math.pi / 180.0
+        self._min_angle = -52.0 * math.pi / 180.0
         self._max_dangle = self._max_angle - self._min_angle
 
         self.x_thereshold = 2
@@ -35,8 +40,6 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
             [
                 self._max_angle,
                 5 * self._max_dangle,
-                self._max_angle,
-                1,
             ],
             dtype=np.float32,
         )
@@ -44,13 +47,11 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
             [
                 self._min_angle,
                 -5 * self._max_dangle,
-                self._min_angle,
-                0,
             ],
             dtype=np.float32
         )
 
-        self.action_space = gym.spaces.Box(0, 1, dtype=np.float32)
+        self.action_space = gym.spaces.Box(-1, 1, dtype=np.float32)
         self.observation_space = gym.spaces.Box(low, high, dtype=np.float32)
 
         self.render_mode = render_mode
@@ -62,8 +63,6 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
         self.isopen = True
         self.state: np.ndarray | None = None
 
-        self.steps_beyond_terminated = None
-
 
     def step(self, action):
         assert self.action_space.contains(action), (
@@ -71,13 +70,17 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
         )
         assert self.state is not None, "Call reset before using step method."
 
-        phi, phi_dot, setpoint, throttle = self.state
+        phi, phi_dot = self.state
+
+        throttle = 0.5 * float(action[0]) + 0.5
+        if throttle < 0.05:
+            throttle = 0.0 #Ponto de zona morta
 
         motor_force = throttle * self._throttle_converter
         gravity_force = self._mass_arm * self._gravity
 
         cosphi = np.cos(phi)
-        torque = (motor_force + 0.5 * gravity_force * cosphi) * self._length_arm
+        torque = (motor_force - 0.5 * gravity_force * cosphi) * self._length_arm
         phi_acc = torque / self._inertia_momentum
 
         if self.kinematics_integrator == "euler":
@@ -87,37 +90,40 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
             phi_dot = phi_dot + self._tau * phi_acc
             phi = phi + self._tau * phi_dot
             
-        self.state = np.array((phi, phi_dot, setpoint, throttle), dtype=np.float64)
-
         terminated = bool(
             phi < self._min_angle
             or phi > self._max_angle
+            # or phi_dot > 5 * self._max_dangle
+            # or phi_dot < -5 * self._max_dangle
         )
 
+        # Keep observations within bounds even on termination.
+        raw_state = np.array((phi, phi_dot), dtype=np.float64)
+        self.state = np.clip(
+            raw_state, self.observation_space.low, self.observation_space.high
+        )
+
+
         phi_dot_error = (phi_dot/(5 * self._max_dangle))**2
-        phi_error = (phi/self._max_dangle)**2
-        PHI_DOT_WEIGHT = 0.5
-        PHI_WEIGHT = 0.5
+        phi_error = ((phi-self._setpoint)/self._max_dangle)**2
+        PHI_DOT_WEIGHT = 0.2
+        PHI_WEIGHT = 1
+        ACTION_WEIGHT = 0.2
 
         if not terminated:
-            reward = - (PHI_DOT_WEIGHT * phi_dot_error + PHI_WEIGHT * phi_error)
-        elif self.steps_beyond_terminated is None:
-            self.steps_beyond_terminated = 0
-            reward = - (PHI_DOT_WEIGHT * phi_dot_error + PHI_WEIGHT * phi_error)
+            reward = - (PHI_DOT_WEIGHT * phi_dot_error + PHI_WEIGHT * phi_error + ACTION_WEIGHT * (throttle - self._equilibrium)**2)
         else:
-            if self.steps_beyond_terminated == 0:
-                logger.warner(
-                    "You are calling 'step()' even though this enviroment has alredy returned terminated = True"
-                )
-            self.steps_beyond_terminated += 1
-
-            # calculare reward
-            reward = 0.0
+            reward = np.array([-1000.0])
         
         if self.render_mode == "human":
             self.render()
 
-        return np.array(self.state, dtype=np.float32), reward, terminated, False, {}
+        self._steps += 1
+        truncated = False
+        if self._steps >= 1000:
+            truncated = True
+
+        return np.array(self.state, dtype=np.float32), reward.item(), terminated, truncated, {}
 
     def reset(
         self,
@@ -134,24 +140,24 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
         phi_dot_inicial = self.np_random.uniform(
             low=-self._max_dangle / 5, high=self._max_dangle / 5
         )
-        setpoint_inicial = self.np_random.uniform(
+        self._setpoint = self.np_random.uniform(
             low=self._min_angle, high=self._max_angle
         )
-        throttle_inicial = self.np_random.uniform(
-            low=0, high=1
-        )
+
+        self._equilibrium = (0.5 * self._mass_arm * self._gravity 
+                            * np.cos(self._setpoint))/self._throttle_converter
 
         self.state = np.array(
             [
-                phi_inicial, phi_dot_inicial, setpoint_inicial, throttle_inicial
+                phi_inicial, phi_dot_inicial
             ],
             dtype=np.float32
         )
-        self.steps_beyond_terminated = None
+        self._steps = 0
 
         if self.render_mode == "human":
             self.render()
-        return self.state, {}
+        return self.state, {"setpoint":self._setpoint}
     
     def render(self):
         if self.render_mode is None:
@@ -186,8 +192,8 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
 
         world_width = self.x_thereshold * 2
         scale = self.screen_width / world_width
-        armwi = 20
-        armlen = scale * self._length_arm
+        armwi_px = 20
+        armlen_px = scale * self._length_arm
 
         if self.state is None:
             return None
@@ -202,22 +208,28 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
         center_x = self.screen_width / 2
         center_y = self.screen_height / 2 
 
-        p1_x = -senphi * (armwi / 2) * scale
-        p1_y =  cosphi * (armwi / 2) * scale
+        x1, y1 = 0, -armwi_px / 2          # Base inferior
+        x2, y2 = 0, armwi_px / 2           # Base superior
+        x3, y3 = armlen_px, armwi_px / 2   # Ponta superior
+        x4, y4 = armlen_px, -armwi_px / 2  # Ponta inferior
 
-        p2_x =  senphi * (armwi / 2) * scale
-        p2_y =  cosphi * (armwi / 2) * scale  
+        # 3. Aplicamos a Matriz de Rotação 2D
+        p1_x = x1 * cosphi - y1 * senphi
+        p1_y = x1 * senphi + y1 * cosphi
 
-        p3_x = (cosphi * armlen + senphi * armwi / 2) * scale
-        p3_y = (senphi * armlen - cosphi * armwi / 2) * scale
+        p2_x = x2 * cosphi - y2 * senphi
+        p2_y = x2 * senphi + y2 * cosphi
 
-        p4_x = (cosphi * armlen - senphi * armwi / 2) * scale
-        p4_y = (senphi * armlen + cosphi * armwi / 2) * scale
+        p3_x = x3 * cosphi - y3 * senphi
+        p3_y = x3 * senphi + y3 * cosphi
 
-        c1 = (int(float(center_x + p1_x)), int(float(center_y - p1_y)))
-        c2 = (int(float(center_x + p2_x)), int(float(center_y - p2_y)))
-        c3 = (int(float(center_x + p3_x)), int(float(center_y - p3_y)))
-        c4 = (int(float(center_x + p4_x)), int(float(center_y - p4_y)))
+        p4_x = x4 * cosphi - y4 * senphi
+        p4_y = x4 * senphi + y4 * cosphi
+
+        c1 = (int(center_x + p1_x), int(center_y - p1_y))
+        c2 = (int(center_x + p2_x), int(center_y - p2_y))
+        c3 = (int(center_x + p3_x), int(center_y - p3_y))
+        c4 = (int(center_x + p4_x), int(center_y - p4_y))
         
         arm_coords = [c1, c2, c3, c4]
         

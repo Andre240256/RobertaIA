@@ -16,3 +16,10 @@ referencias/
 *.fls
 *.log
 *.synctex.gz
+/logs
+
+# simulation matlab compilation files
+simulacao/slprj
+
+#Python cache
+*__pycache__

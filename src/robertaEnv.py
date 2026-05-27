@@ -6,6 +6,12 @@ from gymnasium import logger, spaces
 from gymnasium.envs.classic_control import utils
 from gymnasium.error import DependencyNotInstalled
 
+PHI_DOT_WEIGHT = 0.1
+PHI_WEIGHT = 2.5
+ACTION_WEIGHT = 0.1
+KILL_REWARD = -2000
+MAX_STEPS = 1000
+
 
 class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
 
@@ -106,21 +112,18 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
 
         phi_dot_error = (phi_dot/(5 * self._max_dangle))**2
         phi_error = ((phi-self._setpoint)/self._max_dangle)**2
-        PHI_DOT_WEIGHT = 0.2
-        PHI_WEIGHT = 1
-        ACTION_WEIGHT = 0.2
 
         if not terminated:
             reward = - (PHI_DOT_WEIGHT * phi_dot_error + PHI_WEIGHT * phi_error + ACTION_WEIGHT * (throttle - self._equilibrium)**2)
         else:
-            reward = np.array([-1000.0])
+            reward = np.array([KILL_REWARD])
         
         if self.render_mode == "human":
             self.render()
 
         self._steps += 1
         truncated = False
-        if self._steps >= 1000:
+        if self._steps >= MAX_STEPS:
             truncated = True
 
         return np.array(self.state, dtype=np.float32), reward.item(), terminated, truncated, {}

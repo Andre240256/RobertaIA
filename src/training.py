@@ -1,5 +1,7 @@
+from robertaEnv import RobertaEnv
 from model_SAC_functions import set_seed, create_sac
 
+import argparse
 import time
 import os
 import gymnasium as gym
@@ -11,7 +13,7 @@ def train_sac(lr, timesteps, seed):
 
     set_seed(seed)
 
-    timestamp = time.strftime("%d/%m/%Y-%H %M %S")
+    timestamp = time.strftime("%d/%m/%Y-%H:%M:%S")
     log_dir = f"logs/SAC_Roberta_lr{lr}_seed{seed}_episodes{timesteps}_{timestamp}"
     os.makedirs(log_dir, exist_ok=True)
 
@@ -44,3 +46,24 @@ def train_sac(lr, timesteps, seed):
 
     print(f"\n Model saved to: {model_path}\n")
     env.close()
+
+if __name__ == "__main__":
+    gym.register(
+        id='RobertaEnv-v0',
+        entry_point=RobertaEnv,
+        max_episode_steps=1000,
+    )
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--lr", type=float, default=3e-4)
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--timesteps", type=int, default=None)
+
+    args = parser.parse_args()
+
+    if args.timesteps == None:
+        print("ERROR: not defined the --timesteps for training")
+    else:
+        print("Initing training!")
+        train_sac(args.lr, args.timesteps, args.seed)
+

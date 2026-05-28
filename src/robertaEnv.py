@@ -158,9 +158,27 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
         )
         self._steps = 0
 
+        initial_info = {
+            "setpoint":self._setpoint,
+            "gravity":self._gravity,
+            "tau":self._tau,
+            "throttle_converter":self._throttle_converter,
+            "mass_arm":self._mass_arm,
+            "length_arm":self._length_arm,
+            "kinematics_integrator":self.kinematics_integrator,
+            "max_angle":self._max_angle,
+            "min_angle":self._min_angle,
+            "max_dangle":self._max_dangle,
+            "phi_dot_weight": PHI_DOT_WEIGHT,
+            "phi_weight": PHI_WEIGHT,
+            "action_weight":ACTION_WEIGHT,
+            "kill_reward": KILL_REWARD,
+            "max_steps":MAX_STEPS,
+        }
+
         if self.render_mode == "human":
             self.render()
-        return self.state, {"setpoint":self._setpoint}
+        return self.state, initial_info
     
     def render(self):
         if self.render_mode is None:

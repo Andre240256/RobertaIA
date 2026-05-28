@@ -1,0 +1,11 @@
+--extra-index-url https://download.pytorch.org/whl/cu132
+
+gymnasium[classic-control]==1.2.3
+stable-baselines3==2.8.0
+torch==2.12.0+cu132
+numpy==2.4.4
+matplotlib==3.10.9
+seaborn==0.13.2
+tqdm==4.67.3
+pyserial==3.5
+tensorboard==2.20.0

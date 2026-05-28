@@ -19,12 +19,16 @@ def run_demo(model_path, episodes):
     
     print(f"\n Running SAC Demo: {model_path}\n")
 
+    img_dir = model_path.replace(".zip", "") + "/images_test"
+    os.makedirs(img_dir, exist_ok=True)
+
     env = make_env(render_mode="human")
     model = SAC.load(model_path)
 
     for ep in range(episodes):
         obs, info = env.reset()
-        print(f"Setpoint: {info["setpoint"] * 180 / math.pi}")
+        setpoint = info["setpoint"]
+        print(f"Setpoint: {setpoint * 180 / math.pi}")
         done = False
         ep_reward = 0
         tic = 0
@@ -52,13 +56,16 @@ def run_demo(model_path, episodes):
 
         print(f"Episode {ep + 1} Reward = {ep_reward}")
 
-    setpoint_vec = np.ones_like(phi) * info["setpoint"]
-    plt.plot(step, phi, color='b')
-    plt.plot(step, setpoint_vec, color='r')
-    plt.xlabel('Steps')
-    plt.ylabel('Angle (phi)')
-    plt.grid()
-    plt.show()
+        setpoint_vec = np.ones_like(phi) * setpoint
+
+        plt.plot(step, phi, color='b')
+        plt.plot(step, setpoint_vec, color='r')
+        plt.xlabel('Steps')
+        plt.ylabel('Angle (phi)')
+        plt.grid()
+        img_pth = os.path.join(img_dir, f"episode_{ep+1}_reward_{ep_reward}.png")
+        plt.savefig(img_pth)
+        plt.close()
     
     env.close()
 

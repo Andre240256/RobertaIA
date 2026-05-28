@@ -5,6 +5,7 @@ import argparse
 import time
 import os
 import gymnasium as gym
+import json
 
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import EvalCallback
@@ -17,8 +18,16 @@ def train_sac(lr, timesteps, seed):
     log_dir = f"logs/SAC_Roberta_lr{lr}_seed{seed}_episodes{timesteps}_{timestamp}"
     os.makedirs(log_dir, exist_ok=True)
 
+    env = gym.make("RobertaEnv-v0")
+    _, info = env.reset()
+    json_path = os.path.join(log_dir, "info.json")
+    with open(json_path, "w") as js:
+        json.dump(info, js, indent=4, sort_keys=False)
+    env.close()
+
     env = make_vec_env("RobertaEnv-v0", n_envs=24, seed=seed)
     eval_env = gym.make("RobertaEnv-v0")
+
 
     eval_callback = EvalCallback(
         eval_env, 

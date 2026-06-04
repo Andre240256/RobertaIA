@@ -5,7 +5,7 @@ from stable_baselines3 import SAC
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import gymnasium as gym
 
-class RobertaPolicy(BaseFeaturesExtractor):
+class RobertaFeatureExtractor(BaseFeaturesExtractor):
 
     def __init__(self, observation_space: gym.spaces.Box, features_dim: int = 64):
 
@@ -18,8 +18,8 @@ class RobertaPolicy(BaseFeaturesExtractor):
         self.fc2 = nn.Linear(64, features_dim)
 
     def forward(self, observations: torch.Tensor) -> torch.Tensor:
-        observations = F.leaky_relu(self.fc1(observations))
-        observations = self.dropout(observations)
-        observations = F.leaky_relu(self.fc2(observations))
+        x = F.leaky_relu(self.fc1(observations))
+        x = self.dropout(x)
+        x = F.leaky_relu(self.fc2(x))
 
-        return observations
+        return x

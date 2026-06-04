@@ -1,5 +1,5 @@
 from robertaEnv import RobertaEnv
-from robertaPolicy import RobertaPolicy
+from robertaFeatureExtractor import RobertaPolicy
 
 import argparse
 import os
@@ -48,7 +48,7 @@ def create_sac(env, lr, log_dir):
         device="cpu",
         gamma=0.99,
         ent_coef="auto",
-        buffer_size=1000000,
+        buffer_size=10000000,
         batch_size=256,
         tau=0.005,
         train_freq=1,

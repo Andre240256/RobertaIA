@@ -1,5 +1,5 @@
 from robertaEnv import RobertaEnv
-from robertaFeatureExtractor import RobertaPolicy
+from robertaFeatureExtractor import RobertaFeatureExtractor
 
 import argparse
 import os
@@ -33,7 +33,7 @@ def linear_schedule(initial_value: float):
 def create_sac(env, lr, log_dir):
 
     custom_policy = dict(
-        features_extractor_class=RobertaPolicy,
+        features_extractor_class=RobertaFeatureExtractor,
         features_extractor_kwargs=dict(features_dim=64),
         net_arch=dict(
             pi=[32],

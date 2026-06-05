@@ -6,10 +6,10 @@ from gymnasium import logger, spaces
 from gymnasium.envs.classic_control import utils
 from gymnasium.error import DependencyNotInstalled
 
-PHI_DOT_WEIGHT = 0.1
-PHI_WEIGHT = 2.5
-ACTION_WEIGHT = 0.1
-KILL_REWARD = -2000
+PHI_WEIGHT = 15.0         
+PHI_DOT_WEIGHT = 0.001
+ACTION_WEIGHT = 0.01    
+KILL_REWARD = -10000       
 MAX_STEPS = 1000
 
 
@@ -46,6 +46,7 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
             [
                 self._max_angle,
                 5 * self._max_dangle,
+                self._max_angle,
             ],
             dtype=np.float32,
         )
@@ -53,6 +54,7 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
             [
                 self._min_angle,
                 -5 * self._max_dangle,
+                self._min_angle,
             ],
             dtype=np.float32
         )
@@ -76,7 +78,7 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
         )
         assert self.state is not None, "Call reset before using step method."
 
-        phi, phi_dot = self.state
+        phi, phi_dot, setpoint = self.state
 
         throttle = 0.5 * float(action[0]) + 0.5
         if throttle < 0.05:
@@ -104,14 +106,14 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
         )
 
         # Keep observations within bounds even on termination.
-        raw_state = np.array((phi, phi_dot), dtype=np.float64)
+        raw_state = np.array((phi, phi_dot, setpoint), dtype=np.float64)
         self.state = np.clip(
             raw_state, self.observation_space.low, self.observation_space.high
         )
 
 
         phi_dot_error = (phi_dot/(5 * self._max_dangle))**2
-        phi_error = ((phi-self._setpoint)/self._max_dangle)**2
+        phi_error = ((phi-setpoint)/self._max_dangle)**2
 
         if not terminated:
             reward = - (PHI_DOT_WEIGHT * phi_dot_error + PHI_WEIGHT * phi_error + ACTION_WEIGHT * (throttle - self._equilibrium)**2)
@@ -152,7 +154,7 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
 
         self.state = np.array(
             [
-                phi_inicial, phi_dot_inicial
+                phi_inicial, phi_dot_inicial, self._setpoint
             ],
             dtype=np.float32
         )

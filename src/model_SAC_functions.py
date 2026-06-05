@@ -1,5 +1,4 @@
 from robertaEnv import RobertaEnv
-from robertaFeatureExtractor import RobertaFeatureExtractor
 
 import argparse
 import os
@@ -32,19 +31,19 @@ def linear_schedule(initial_value: float):
 
 def create_sac(env, lr, log_dir):
 
-    custom_policy = dict(
-        features_extractor_class=RobertaFeatureExtractor,
-        features_extractor_kwargs=dict(features_dim=64),
-        net_arch=dict(
+    
+    policy_kwards =dict(
+        net_arch = dict(
             pi=[32],
             qf=[32]
         )
     )
+    
 
     model = SAC(
         "MlpPolicy",
         env=env,
-        policy_kwargs=custom_policy,
+        policy_kwargs=policy_kwards,
         device="cpu",
         gamma=0.99,
         ent_coef="auto",
@@ -59,22 +58,3 @@ def create_sac(env, lr, log_dir):
     )
 
     return model
-
-def retrain_sac(model_path: str, timesteps: int, seed: int):
-    set_seed(seed)
-    env = make_vec_env("RobertaEnv-v0", n_envs=16, seed=seed)
-
-    model = SAC.load(model_path, env=env)
-
-    model.learn(
-        total_timesteps=timesteps,
-        progress_bar=True,
-        reset_num_timesteps=False,
-        tb_log_name="SAC_FineTuning"
-    )
-
-    new_path = model_path.replace(".zip", "_v2.zip")
-    model.save(new_path)
-    print(f"New model saved to: {model_path}")
-
-    env.close()

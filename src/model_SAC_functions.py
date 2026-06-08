@@ -6,6 +6,7 @@ import time
 import gymnasium as gym
 import numpy as np
 import torch
+import torch.nn as nn
 
 from stable_baselines3 import SAC
 from stable_baselines3.common.monitor import Monitor
@@ -36,7 +37,8 @@ def create_sac(env, lr, log_dir):
         net_arch = dict(
             pi=[32],
             qf=[32]
-        )
+        ),
+        activation_fn=nn.ReLU
     )
     
 

@@ -9,10 +9,11 @@ import gymnasium as gym
 import matplotlib.pyplot as plt
 
 from stable_baselines3 import SAC
+from stable_baselines3 import PPO
 
 
-def run_demo(model_path, episodes):
-
+def run_demo(model_path, episodes, device = "cpu"):
+ 
     if not os.path.exists(model_path):
         print(f"\n Model not found: {model_path}\n")
         return
@@ -23,11 +24,19 @@ def run_demo(model_path, episodes):
     os.makedirs(img_dir, exist_ok=True)
 
     env = make_env(render_mode="human")
-    model = SAC.load(model_path)
+
+    algorithm = model_path.replace("logs/", "").split('_')[0]
+
+    if algorithm == "SAC":
+        model = SAC.load(model_path, device=device)
+    elif algorithm == "PPO":
+        model = PPO.load(model_path, device=device)
+    else:
+        raise ValueError('Name does not contain a valid algorithm.')
 
     for ep in range(episodes):
-        obs, info = env.reset()
-        setpoint = info["setpoint"]
+        obs, _ = env.reset()
+        setpoint = obs[2]
         print(f"Setpoint: {setpoint * 180 / math.pi}")
         done = False
         ep_reward = 0
@@ -80,11 +89,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", type=str, default=None)
     parser.add_argument("--episodes", type=int, default=10)
-    # parser.add_argument("--help")
+    parser.add_argument("--device", type=str, default="cpu")
 
     args = parser.parse_args()
 
     if args.model is None:
         print("\n ERROR: missing --model path\n")
     else:
-        run_demo(args.model, args.episodes)
+        run_demo(args.model, args.episodes, device=args.device)

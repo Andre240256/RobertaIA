@@ -6,11 +6,11 @@ from gymnasium import logger, spaces
 from gymnasium.envs.classic_control import utils
 from gymnasium.error import DependencyNotInstalled
 
-PHI_WEIGHT = 15.0         
-PHI_DOT_WEIGHT = 0.001
-ACTION_WEIGHT = 0.01    
-KILL_REWARD = -10000       
-MAX_STEPS = 1000
+PHI_WEIGHT = 20.0         
+PHI_DOT_WEIGHT = 0.00
+ACTION_WEIGHT = 0.00   
+KILL_REWARD = -20000       
+MAX_STEPS = 2000
 
 
 class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
@@ -161,7 +161,6 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
         self._steps = 0
 
         initial_info = {
-            "setpoint":self._setpoint,
             "gravity":self._gravity,
             "tau":self._tau,
             "throttle_converter":self._throttle_converter,

@@ -25,7 +25,7 @@ def run_demo(model_path, episodes, device = "cpu"):
 
     env = make_env(render_mode="human")
 
-    algorithm = model_path.replace("logs/", "").split('_')[0]
+    algorithm = model_path.replace("logs/", "").split('/')[0]
 
     if algorithm == "SAC":
         model = SAC.load(model_path, device=device)

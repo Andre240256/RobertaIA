@@ -6,11 +6,14 @@ from gymnasium import logger, spaces
 from gymnasium.envs.classic_control import utils
 from gymnasium.error import DependencyNotInstalled
 
-PHI_WEIGHT = 5.0   
-SURVIVAL_REWARD = 1.0      
-PHI_DOT_WEIGHT = 1.00
-ACTION_WEIGHT = 1.00   
-KILL_REWARD = -20000       
+from reward_shaping import (
+    ACTION_WEIGHT,
+    KILL_REWARD,
+    PHI_DOT_WEIGHT,
+    PHI_WEIGHT,
+    SURVIVAL_REWARD,
+    compute_reward,
+)
 MAX_STEPS = 2000
 
 
@@ -116,17 +119,15 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
             raw_state, self.observation_space.low, self.observation_space.high
         )
 
-        #punir por velocidade muito alta (esforco do motor)
-        phi_dot_error = (phi_dot/(5 * self._max_dangle))**2
-        #punir por distancia do objetivo
-        phi_error = ((phi-setpoint)/self._max_dangle)**2
-        # punicao por velocidade + punicao por distancia + punicao por sobrecarga  
-        # do motor + reward por sobrevivencia
-        if not terminated:
-            reward = - (PHI_DOT_WEIGHT * phi_dot_error + PHI_WEIGHT * phi_error 
-                        + ACTION_WEIGHT * (throttle - self._equilibrium)**2) + SURVIVAL_REWARD
-        else:
-            reward = np.array([KILL_REWARD])
+        reward = compute_reward(
+            phi=phi,
+            phi_dot=phi_dot,
+            setpoint=setpoint,
+            throttle=throttle,
+            equilibrium=self._equilibrium,
+            max_dangle=self._max_dangle,
+            terminated=terminated,
+        )
         
         if self.render_mode == "human":
             self.render()

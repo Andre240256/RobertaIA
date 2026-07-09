@@ -15,8 +15,8 @@ def train_sac(lr, timesteps, seed, algorithm):
 
     set_seed(seed)
 
-    timestamp = time.strftime("%d/%m/%Y-%H:%M:%S")
-    log_dir = f"logs/{algorithm}_Roberta_lr{lr}_seed{seed}_episodes{timesteps}_{timestamp}"
+    timestamp = time.strftime("%d-%m-%Y-%H:%M:%S")
+    log_dir = f"logs/{algorithm}/lr{lr}_seed{seed}_episodes{timesteps}_{timestamp}"
     os.makedirs(log_dir, exist_ok=True)
 
     env = gym.make("RobertaEnv-v0")

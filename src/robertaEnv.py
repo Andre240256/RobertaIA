@@ -6,12 +6,12 @@ from gymnasium import logger, spaces
 from gymnasium.envs.classic_control import utils
 from gymnasium.error import DependencyNotInstalled
 
+# from render import render
 from reward_shaping import (
     ACTION_WEIGHT,
     KILL_REWARD,
     PHI_DOT_WEIGHT,
     PHI_WEIGHT,
-    SURVIVAL_REWARD,
     compute_reward,
 )
 MAX_STEPS = 2000
@@ -137,7 +137,7 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
         if self._steps >= MAX_STEPS:
             truncated = True
 
-        return np.array(self.state, dtype=np.float32), reward.item(), terminated, truncated, {}
+        return np.array(self.state, dtype=np.float32), reward, terminated, truncated, {}
 
     def reset(
         self,
@@ -193,6 +193,7 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
         return self.state, initial_info
     
     def render(self):
+        # render(self)
         if self.render_mode is None:
             assert self.spec is None
             logger.warn(

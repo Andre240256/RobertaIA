@@ -1,7 +1,6 @@
 import math
 
 import numpy as np
-import gymnasium as gym
 from gymnasium import logger
 from gymnasium.error import DependencyNotInstalled
 

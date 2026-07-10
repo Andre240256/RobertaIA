@@ -26,22 +26,21 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
         self._gravity = 9.8
         self._tau = 0.001
         self._throttle_converter = 12.25
-        self._setpoint = 0.0
-        self._equilibrium = 0.0
 
-        self._mass_arm = 1.0
-        self._length_arm = 0.4
-        self._inertia_momentum = (self._mass_arm * self._length_arm ** 2)/3
+        self._setpoint = None
+        self._equilibrium = None
+        self._mass_arm = None
+        self._length_arm = None
+        self._inertia_momentum = None
 
         self.kinematics_integrator = ""
         self._steps = 0
         
+        self.x_thereshold = 2
 
         self._max_angle = 45.0 * math.pi / 180.0
         self._min_angle = -52.0 * math.pi / 180.0
         self._max_dangle = self._max_angle - self._min_angle
-
-        self.x_thereshold = 2
 
         high = np.array(
             [
@@ -144,6 +143,8 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
     ):
         super().reset(seed=seed)
 
+        self._mass_arm, self._length_arm, self._inertia_momentum = self.sample_digitaltwin()
+
         phi_inicial = self.np_random.uniform(
             low=self._min_angle, high=self._max_angle
         )
@@ -172,8 +173,6 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
             "gravity":self._gravity,
             "tau":self._tau,
             "throttle_converter":self._throttle_converter,
-            "mass_arm":self._mass_arm,
-            "length_arm":self._length_arm,
             "kinematics_integrator":self.kinematics_integrator,
             "max_angle":self._max_angle,
             "min_angle":self._min_angle,
@@ -200,3 +199,8 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
             pygame.quit()
             self.isopen = False
     
+    def sample_digitaltwin(self) ->  tuple:
+        mass_arm = self.np_random.uniform(0.9, 1.1) #mass from 0.9 to 1.1
+        length_arm = self.np_random.uniform(0.3, 0.5) #size is from 0.3m to 0.5m
+        inertia_momentum = (mass_arm * length_arm ** 2)/3
+        return mass_arm, length_arm, inertia_momentum

@@ -1,5 +1,6 @@
 from robertaEnv import RobertaEnv
-from model_SAC_functions import make_env
+from stable_baselines3.common.env_util import make_vec_env
+from stable_baselines3.common.vec_env import VecFrameStack
 
 import argparse
 import math
@@ -18,14 +19,16 @@ def run_demo(model_path, episodes, device = "cpu"):
         print(f"\n Model not found: {model_path}\n")
         return
     
-    print(f"\n Running SAC Demo: {model_path}\n")
 
     img_dir = model_path.replace(".zip", "") + "/images_test"
     os.makedirs(img_dir, exist_ok=True)
 
-    env = make_env(render_mode="human")
+    env = make_vec_env("RobertaEnv-v0", n_envs=1,
+                       env_kwargs={'render_mode':'human'})
+    env = VecFrameStack(env, n_stack=4)
 
     algorithm = model_path.replace("logs/", "").split('/')[0]
+    print(f"\n Running {algorithm} Demo: {model_path}\n")
 
     if algorithm == "SAC":
         model = SAC.load(model_path, device=device)
@@ -35,8 +38,8 @@ def run_demo(model_path, episodes, device = "cpu"):
         raise ValueError('Name does not contain a valid algorithm.')
 
     for ep in range(episodes):
-        obs, _ = env.reset()
-        setpoint = obs[2]
+        obs = env.reset()
+        setpoint = obs[0][-2]
         print(f"Setpoint: {setpoint * 180 / math.pi}")
         done = False
         ep_reward = 0
@@ -47,28 +50,29 @@ def run_demo(model_path, episodes, device = "cpu"):
 
         while not done:
             action, _ = model.predict(obs, deterministic=True)
-            obs, reward, terminated, truncated, info = env.step(action)
-            ep_reward += reward
+            obs, reward, dones, info = env.step(action)
+            ep_reward += reward[0]
 
             env.render()
 
             tic += 1
             step.append(tic)
-            phi.append(obs[0])
+            phi.append(obs[0][-4])
             
-            done = terminated or truncated
-            if terminated:
-                print("Killed")
-            if truncated:
-                print("Max steps, truncating episode")
+            done = dones[0]
+            if done:
+                if info[0].get("TimeLimit.truncated", False):
+                    print("Max steps, truncating episode")
+                else:
+                    print("Killed")
 
 
         print(f"Episode {ep + 1} Reward = {ep_reward}")
 
         setpoint_vec = np.ones_like(phi) * setpoint
 
-        plt.plot(step, phi, color='b')
-        plt.plot(step, setpoint_vec, color='r')
+        plt.plot(step[:-3], phi[:-3], color='b')
+        plt.plot(step[:-3], setpoint_vec[:-3], color='r')
         plt.xlabel('Steps')
         plt.ylabel('Angle (phi)')
         plt.grid()

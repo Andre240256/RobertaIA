@@ -45,7 +45,7 @@ def render(Env: 'RobertaEnv') -> None:
         return None
 
     # Geometry and transforms
-    phi, phi_dot, setpoint = Env.state
+    phi, phi_dot, setpoint, _ = Env.state
     world_width = Env.x_thereshold * 2
     scale = Env.screen_width / world_width
     armlen_px = scale * Env._length_arm

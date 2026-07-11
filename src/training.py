@@ -10,8 +10,9 @@ import json
 
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import EvalCallback
+from stable_baselines3.common.vec_env import VecFrameStack
 
-def train_sac(lr, timesteps, seed, algorithm):
+def train(lr, timesteps, seed, algorithm):
 
     set_seed(seed)
 
@@ -27,9 +28,10 @@ def train_sac(lr, timesteps, seed, algorithm):
         json.dump(info, js, indent=4, sort_keys=False)
     env.close()
 
-    env = make_vec_env("RobertaEnv-v0", n_envs=24, seed=seed)
-    eval_env = gym.make("RobertaEnv-v0")
-
+    env = make_vec_env("RobertaEnv-v0", n_envs=16, seed=seed)
+    env = VecFrameStack(env, n_stack=4)
+    eval_env = make_vec_env("RobertaEnv-v0", n_envs=1, seed=seed)
+    eval_env = VecFrameStack(eval_env, n_stack=4)
 
     eval_callback = EvalCallback(
         eval_env, 
@@ -86,5 +88,5 @@ if __name__ == "__main__":
         print("ERROR: not defined the --timesteps for training")
     else:
         print("Initing training!")
-        train_sac(args.lr, args.timesteps, args.seed, args.algorithm)
+        train(args.lr, args.timesteps, args.seed, args.algorithm)
 

@@ -16,7 +16,7 @@ MAX_STEPS = 2000
 
 
 class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
-    """
+    r"""
     Implements a 1-Degree of Freedom (1-DOF) mechanical arm environment for Reinforcement Learning.
     The dynamics are governed by the equation of motion for a rigid body:
     I * \ddot{\phi} = \tau_{motor} - \tau_{gravity}
@@ -33,16 +33,16 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
     }
 
     def __init__(self, render_mode: str | None = None):
-        """
+        r"""
         Initializes the RobertaEnv, defining the physical constants, constraints, and operational spaces.
         The state space is a continuous vector space R^3 representing [\phi, \dot{\phi}, \phi^*].
         The action space is a continuous vector space R^1 representing the normalized throttle.
         :param render_mode: string specifying the rendering method ("human" or "rgb_array").
         """
-        self._gravity = 9.8
+        self._gravity = 9.81
         self._tau = 0.01 
-        self._throttle_converter = 12.25
 
+        self._throttle_converter = None
         self._setpoint = None
         self._equilibrium = None
         self._mass_arm = None
@@ -65,6 +65,7 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
                 self._max_angle,
                 5 * self._max_dangle,
                 self._max_angle,
+                1.0,
             ],
             dtype=np.float32,
         )
@@ -73,6 +74,7 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
                 self._min_angle,
                 -5 * self._max_dangle,
                 self._min_angle,
+                -1.0,
             ],
             dtype=np.float32
         )
@@ -92,7 +94,7 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
 
 
     def step(self, action):
-        """
+        r"""
         Executes one timestep of the environments dynamics using Euler or semi-implicit Euler integration.
         Calculates the physical interaction \ddot{\phi} = \Sigma \tau / I and updates the state.
 
@@ -109,7 +111,7 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
         )
         assert self.state is not None, "Call reset before using step method."
 
-        phi, phi_dot, setpoint = self.state
+        phi, phi_dot, setpoint, _ = self.state
 
         throttle = 0.5 * float(action[0]) + 0.5
         if throttle < 0.05:
@@ -132,7 +134,8 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
         )
 
         # Keep observations within bounds even on termination.
-        raw_state = np.array((phi, phi_dot, setpoint), dtype=np.float64)
+        self._prev_action = float(action[0])
+        raw_state = np.array((phi, phi_dot, setpoint, self._prev_action), dtype=np.float64)
         self.state = np.clip(
             raw_state, self.observation_space.low, self.observation_space.high
         )
@@ -163,7 +166,7 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
         seed: int | None = None,
         options: dict | None = None,       
     ):
-        """
+        r"""
         Resets the environment to a random initial state and applies Domain Randomization
         to the digital twins physical parameters.
 
@@ -175,18 +178,25 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
         """
         super().reset(seed=seed)
 
+        self._mass_arm = None
+        self._length_arm = None
+        self._inertia_momentum = None
+        self._friction_constant = None
+        self._throttle_converter = None
+
         if options is not None:
             self._mass_arm = options["mass_arm"]
             self._length_arm = options["length_arm"]
             self._inertia_momentum = (options["inertia_momentum"] if 'inertia_momentum' in options
                                       else (self._mass_arm * self._length_arm**2)/3) 
             self._friction_constant = options["friction_constant"]
-        else:
-            self._mass_arm, self._length_arm, self._inertia_momentum, self._friction_constant = self._sample_digitaltwin()
+            self._throttle_converter = options['throttle_converter']
+        
+        self._sample_digitaltwin()
             
         self._edo_solver = edo_solver(self._edo_func(), self._tau)
 
-        phi_inicial = self.np_random.uniform(
+        phi_inicial = self._last_phi_obs = self.np_random.uniform(
             low=self._min_angle, high=self._max_angle
         )
         # Velocidade inicial limitada a 20% (5x menor) da velocidade máxima
@@ -200,9 +210,10 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
         self._equilibrium = (0.5 * self._mass_arm * self._gravity 
                             * np.cos(self._setpoint))/self._throttle_converter
 
+        self._prev_action = 0.0
         self.state = np.array(
             [
-                phi_inicial, phi_dot_inicial, self._setpoint
+                phi_inicial, phi_dot_inicial, self._setpoint, self._prev_action
             ],
             dtype=np.float32
         )
@@ -238,23 +249,24 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
             pygame.display.quit()
             pygame.quit()
             self.isopen = False
-
-    def _get_obs(self):
-        pass
     
-    def _sample_digitaltwin(self) ->  tuple:
-        """
+    def _sample_digitaltwin(self):
+        r"""
         Samples the physical parameters for Domain Randomization.
         Models the arm as a uniform rod pivoting at one end, governed by I = (m * L^2) / 3.
 
         :return: tuple of floats (mass_arm, length_arm, inertia_momentum)
         """
-        mass_arm = self.np_random.uniform(0.9, 1.1) #mass from 0.9 to 1.1
-        length_arm = self.np_random.uniform(0.3, 0.5) #size is from 0.3m to 0.5m
-        inertia_momentum = (mass_arm * length_arm ** 2)/3
-        c = self.np_random.uniform(0, 1) #friction_constant from 0 to 1.0
-        return mass_arm, length_arm, inertia_momentum, c
-    
+        #mass from 0.9 to 1.1
+        self._mass_arm = self.np_random.uniform(0.9, 1.1) if self._mass_arm is None else self._mass_arm 
+        #size is from 0.3m to 0.5m
+        self._length_arm = self.np_random.uniform(0.3, 0.5) if self._length_arm is None else self._length_arm
+        self._inertia_momentum = (self._mass_arm * self._length_arm ** 2)/3 if self._inertia_momentum is None else self._inertia_momentum
+        #friction_constant from 0 to 1.0
+        self._friction_constant = self.np_random.uniform(0.01, 0.25) if self._friction_constant is None else self._friction_constant
+        #throttle converter from 7.5 to 20
+        self._throttle_converter = self.np_random.uniform(12.0, 12.5) if self._throttle_converter is None else self._throttle_converter
+
     def _edo_func(self):
         def F(t, Y, torque_motor):
             phi = Y[0]

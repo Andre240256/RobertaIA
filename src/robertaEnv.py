@@ -15,6 +15,16 @@ MAX_STEPS = 2000
 
 
 class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
+    """
+    Implements a 1-Degree of Freedom (1-DOF) mechanical arm environment for Reinforcement Learning.
+    The dynamics are governed by the equation of motion for a rigid body:
+    I * \ddot{\phi} = \tau_{motor} - \tau_{gravity}
+    
+    Where:
+    - \tau_{motor} = F_{motor} * L = (throttle * c_T) * L
+    - \tau_{gravity} = F_{gravity} * (L/2) * \cos(\phi) = (m * g) * (L/2) * \cos(\phi)
+    (Assuming the center of mass is at L/2).
+    """
 
     metadata = {
         "render_modes":["human", "rgb_array"],
@@ -22,9 +32,14 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
     }
 
     def __init__(self, render_mode: str | None = None):
-
+        """
+        Initializes the RobertaEnv, defining the physical constants, constraints, and operational spaces.
+        The state space is a continuous vector space R^3 representing [\phi, \dot{\phi}, \phi^*].
+        The action space is a continuous vector space R^1 representing the normalized throttle.
+        :param render_mode: string specifying the rendering method ("human" or "rgb_array").
+        """
         self._gravity = 9.8
-        self._tau = 0.001
+        self._tau = 0.01 
         self._throttle_converter = 12.25
 
         self._setpoint = None
@@ -74,6 +89,18 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
 
 
     def step(self, action):
+        """
+        Executes one timestep of the environments dynamics using Euler or semi-implicit Euler integration.
+        Calculates the physical interaction \ddot{\phi} = \Sigma \tau / I and updates the state.
+
+        :param action: array of shape (1,) representing the continuous action chosen by the policy in [-1, 1].
+        :return: tuple of (state, reward, terminated, truncated, info)
+                 - state: np.ndarray of shape (3,) representing (\phi, \dot{\phi}, \phi^*).
+                 - reward: float, scalar reward from the shaping function.
+                 - terminated: bool, True if the arm exceeds angular limits.
+                 - truncated: bool, True if MAX_STEPS is reached.
+                 - info: dict, additional tracking metrics.
+        """
         assert self.action_space.contains(action), (
             f"{action!r} ({type(action)}) invalid"
         )
@@ -141,6 +168,16 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
         seed: int | None = None,
         options: dict | None = None,       
     ):
+        """
+        Resets the environment to a random initial state and applies Domain Randomization
+        to the digital twins physical parameters.
+
+        :param seed: integer to seed the random number generator for reproducibility.
+        :param options: dict with optional configurations.
+        :return: tuple of (state, info)
+                 - state: np.ndarray of shape (3,) representing (\phi_0, \dot{\phi}_0, \phi^*).
+                 - info: dict with the sampled physical parameters and hyperparams.
+        """
         super().reset(seed=seed)
 
         self._mass_arm, self._length_arm, self._inertia_momentum = self.sample_digitaltwin()
@@ -200,6 +237,12 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
             self.isopen = False
     
     def sample_digitaltwin(self) ->  tuple:
+        """
+        Samples the physical parameters for Domain Randomization.
+        Models the arm as a uniform rod pivoting at one end, governed by I = (m * L^2) / 3.
+
+        :return: tuple of floats (mass_arm, length_arm, inertia_momentum)
+        """
         mass_arm = self.np_random.uniform(0.9, 1.1) #mass from 0.9 to 1.1
         length_arm = self.np_random.uniform(0.3, 0.5) #size is from 0.3m to 0.5m
         inertia_momentum = (mass_arm * length_arm ** 2)/3

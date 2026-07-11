@@ -7,8 +7,8 @@ def create_sac(env, lr, log_dir):
     
     policy_kwards =dict(
         net_arch = dict(
-            pi=[32],
-            qf=[32]
+            pi=[64],
+            qf=[64]
         ),
         activation_fn=nn.ReLU
     )

@@ -5,8 +5,8 @@ def create_ppo(env, lr, log_dir):
     
     policy_keywards = dict(
         net_arch = dict(
-            pi=[32],
-            qi=[32]
+            pi=[64],
+            qi=[64]
         ),
         activation_fn=nn.ReLU
     )

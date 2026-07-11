@@ -45,5 +45,7 @@ def compute_reward(
     # atinge menos de 2% de desvio, ancorando o braço no local exato do setpoint.
     if phi_error < 0.02: 
         reward += 5.0
+    if phi_error < 0.005:
+        reward += 5
         
     return float(reward)

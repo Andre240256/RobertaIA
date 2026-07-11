@@ -12,6 +12,21 @@ if TYPE_CHECKING:
 X_THERESHOLD = 2
 
 def render(Env: 'RobertaEnv') -> None:
+    r"""
+    Renders the current state of the mechanical arm environment using PyGame.
+    
+    This function performs a rigid body transformation to map the physical state \phi 
+    to screen coordinates, drawing the arm, a throttle force vector, and an 
+    angular velocity vector.
+    
+    Coordinate transformation:
+    P_{screen} = T_{viewport} \cdot R(\phi) \cdot P_{local}
+    
+    Where R(\phi) is the 2D rotation matrix:
+    R(\phi) = \begin{bmatrix} \cos(\phi) & -\sin(\phi) \\ \sin(\phi) & \cos(\phi) \end{bmatrix}
+
+    :param Env: An instance of RobertaEnv containing the state and display settings.
+    """
     if Env.render_mode is None:
             assert Env.spec is None
             logger.warn(

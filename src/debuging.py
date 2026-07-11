@@ -14,7 +14,16 @@ from stable_baselines3 import PPO
 
 
 def run_demo(model_path, episodes, device = "cpu"):
- 
+    r"""
+    Loads a pre-trained Reinforcement Learning model and evaluates its performance 
+    in a simulated environment. Generates performance plots for each episode to 
+    visualize the convergence of the angle \phi toward the setpoint \phi^*.
+
+    :param model_path: Path to the .zip file containing the trained model (SAC or PPO).
+    :param episodes: Number of evaluation episodes to perform.
+    :param device: Hardware device for inference ("cpu" or "cuda").
+    """
+
     if not os.path.exists(model_path):
         print(f"\n Model not found: {model_path}\n")
         return
@@ -90,10 +99,10 @@ if __name__ == "__main__":
         max_episode_steps=1000,
     )
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=str, default=None)
-    parser.add_argument("--episodes", type=int, default=10)
-    parser.add_argument("--device", type=str, default="cpu")
+    parser = argparse.ArgumentParser(description="Evaluate RL mechanical arm controller.")
+    parser.add_argument("--model", type=str, default=None, help="Path to the model .zip file.")
+    parser.add_argument("--episodes", type=int, default=10, help="Number of episodes to run.")
+    parser.add_argument("--device", type=str, default="cpu", help="Device (cpu/cuda).")
 
     args = parser.parse_args()
 

@@ -4,6 +4,7 @@ import math
 import gymnasium as gym
 
 from render import render
+from edo_solver import edo_solver
 from reward_shaping import (
     ACTION_WEIGHT,
     KILL_REWARD,
@@ -28,7 +29,7 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
 
     metadata = {
         "render_modes":["human", "rgb_array"],
-        "render_fps": 120,
+        "render_fps": 100,
     }
 
     def __init__(self, render_mode: str | None = None):
@@ -47,6 +48,8 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
         self._mass_arm = None
         self._length_arm = None
         self._inertia_momentum = None
+        self._friction_constant = None
+        self._edo_solver = None
 
         self.kinematics_integrator = ""
         self._steps = 0
@@ -116,24 +119,16 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
         self._last_throttle = float(throttle)
 
         motor_force = throttle * self._throttle_converter
-        gravity_force = self._mass_arm * self._gravity
+        torque_motor = motor_force * self._length_arm 
 
-        cosphi = np.cos(phi)
-        torque = (motor_force - 0.5 * gravity_force * cosphi) * self._length_arm
-        phi_acc = torque / self._inertia_momentum
-
-        if self.kinematics_integrator == "euler":
-            phi = phi + self._tau * phi_dot
-            phi_dot = phi_dot + self._tau * phi_acc
-        else:
-            phi_dot = phi_dot + self._tau * phi_acc
-            phi = phi + self._tau * phi_dot
+        Yi = np.array([phi, phi_dot])
+        Yprox = self._edo_solver.passoRK4(0, Yi, torque_motor)
+        phi, phi_dot = Yprox[0], Yprox[1]
+        
             
         terminated = bool(
             phi < self._min_angle
             or phi > self._max_angle
-            # or phi_dot > 5 * self._max_dangle
-            # or phi_dot < -5 * self._max_dangle
         )
 
         # Keep observations within bounds even on termination.
@@ -180,7 +175,16 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
         """
         super().reset(seed=seed)
 
-        self._mass_arm, self._length_arm, self._inertia_momentum = self.sample_digitaltwin()
+        if options is not None:
+            self._mass_arm = options["mass_arm"]
+            self._length_arm = options["length_arm"]
+            self._inertia_momentum = (options["inertia_momentum"] if 'inertia_momentum' in options
+                                      else (self._mass_arm * self._length_arm**2)/3) 
+            self._friction_constant = options["friction_constant"]
+        else:
+            self._mass_arm, self._length_arm, self._inertia_momentum, self._friction_constant = self._sample_digitaltwin()
+            
+        self._edo_solver = edo_solver(self._edo_func(), self._tau)
 
         phi_inicial = self.np_random.uniform(
             low=self._min_angle, high=self._max_angle
@@ -210,7 +214,6 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
             "gravity":self._gravity,
             "tau":self._tau,
             "throttle_converter":self._throttle_converter,
-            "kinematics_integrator":self.kinematics_integrator,
             "max_angle":self._max_angle,
             "min_angle":self._min_angle,
             "max_dangle":self._max_dangle,
@@ -235,8 +238,11 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
             pygame.display.quit()
             pygame.quit()
             self.isopen = False
+
+    def _get_obs(self):
+        pass
     
-    def sample_digitaltwin(self) ->  tuple:
+    def _sample_digitaltwin(self) ->  tuple:
         """
         Samples the physical parameters for Domain Randomization.
         Models the arm as a uniform rod pivoting at one end, governed by I = (m * L^2) / 3.
@@ -246,4 +252,22 @@ class RobertaEnv(gym.Env[np.ndarray, np.ndarray]):
         mass_arm = self.np_random.uniform(0.9, 1.1) #mass from 0.9 to 1.1
         length_arm = self.np_random.uniform(0.3, 0.5) #size is from 0.3m to 0.5m
         inertia_momentum = (mass_arm * length_arm ** 2)/3
-        return mass_arm, length_arm, inertia_momentum
+        c = self.np_random.uniform(0, 1) #friction_constant from 0 to 1.0
+        return mass_arm, length_arm, inertia_momentum, c
+    
+    def _edo_func(self):
+        def F(t, Y, torque_motor):
+            phi = Y[0]
+            phi_dot = Y[1]
+
+            Yprox = np.zeros(2)
+            Yprox[0] = phi_dot
+            
+            torque_gravidade = (self._mass_arm * self._gravity * 
+                                np.cos(phi) * self._length_arm)
+            torque_atrito = self._friction_constant * phi_dot
+
+            Yprox[1] = (torque_motor - torque_gravidade - torque_atrito)/self._inertia_momentum
+
+            return Yprox
+        return F 

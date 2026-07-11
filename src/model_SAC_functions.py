@@ -1,34 +1,6 @@
-from robertaEnv import RobertaEnv
-
-import argparse
-import os
-import time
-import gymnasium as gym
-import numpy as np
-import torch
-import torch.nn as nn
-
+from stable3_aux_funcs import  *
 from stable_baselines3 import SAC
-from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.env_util import make_vec_env
-from stable_baselines3.common.callbacks import EvalCallback
 
-def set_seed(seed):
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
-
-def make_env(render_mode=None):
-    env = gym.make("RobertaEnv-v0", render_mode=render_mode)
-    env = Monitor(env)
-    return env
-
-def linear_schedule(initial_value: float):
-    def func(progress_remaning):
-        return initial_value * (0.5 * (1 + np.cos(np.pi * (1 - progress_remaning))))
-    
-    return func
 
 def create_sac(env, lr, log_dir):
 

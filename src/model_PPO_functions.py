@@ -1,10 +1,5 @@
-import gymnasium as gym
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
+from stable3_aux_funcs import *
 from stable_baselines3 import PPO
-
-from robertaEnv import RobertaEnv
 
 def create_ppo(env, lr, log_dir):
     
@@ -20,7 +15,7 @@ def create_ppo(env, lr, log_dir):
         policy="MlpPolicy",
         env=env,
         policy_kwargs=policy_keywards,
-        learning_rate=lr,
+        learning_rate=linear_schedule(lr),
         device="cpu",
         gamma=0.99,
         batch_size=256,

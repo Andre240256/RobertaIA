@@ -39,7 +39,7 @@ def create_sac(env, lr, log_dir):
         tau=0.005,
         train_freq=1,
         gradient_steps=1,
-        learning_rate=linear_schedule(lr),
+        learning_rate=cossine_schedule(lr),
         verbose=1,
         tensorboard_log=log_dir
     )

@@ -15,7 +15,10 @@ def make_env(render_mode=None):
     env = Monitor(env)
     return env
 
-def linear_schedule(initial_value: float):
+def cossine_schedule(initial_value: float):
+    """
+    Implements a cosine annealing learning rate schedule.
+    """
     def func(progress_remaning):
         return initial_value * (0.5 * (1 + np.cos(np.pi * (1 - progress_remaning))))
     

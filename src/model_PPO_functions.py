@@ -29,7 +29,7 @@ def create_ppo(env, lr, log_dir):
         policy="MlpPolicy",
         env=env,
         policy_kwargs=policy_keywards,
-        learning_rate=linear_schedule(lr),
+        learning_rate=cossine_schedule(lr),
         device="cpu",
         gamma=0.99,
         batch_size=256,

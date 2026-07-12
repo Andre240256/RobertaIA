@@ -1,8 +1,12 @@
+import numpy as np
+
 PHI_WEIGHT = 5.0
 SURVIVAL_REWARD = 1.0
 PHI_DOT_WEIGHT = 1.0
 ACTION_WEIGHT = 1.0
 KILL_REWARD = -20000
+PHI_WEIGHT_N = 5.0
+LAMBDA = 0.001
 
 def compute_reward(
     phi: float,
@@ -38,8 +42,11 @@ def compute_reward(
         PHI_DOT_WEIGHT * phi_dot_error
         + PHI_WEIGHT * phi_error
         + action_penalty
-    ) + SURVIVAL_REWARD
-    
+    ) + (
+        PHI_WEIGHT_N * np.exp(-phi_error**2/LAMBDA)
+        + SURVIVAL_REWARD
+    )
+
     # Bônus de estado estacionário (Zona Alvo):
     # Condição de recompensa superdimensionada acionada apenas quando a precisão 
     # atinge menos de 2% de desvio, ancorando o braço no local exato do setpoint.

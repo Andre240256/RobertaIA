@@ -1,5 +1,6 @@
 from stable3_aux_funcs import *
 from stable_baselines3 import PPO
+import torch.nn as nn
 
 def create_ppo(env, lr, log_dir):
     r"""

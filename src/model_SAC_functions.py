@@ -1,5 +1,6 @@
 from stable3_aux_funcs import  *
 from stable_baselines3 import SAC
+import torch.nn as nn
 
 
 def create_sac(env, lr, log_dir):

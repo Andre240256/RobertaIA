@@ -1,83 +1,111 @@
-# RobertaIA - First Steps
+# RobertaIA - Tutorial de Uso
 
-Welcome to the RobertaIA project! This document serves as a guide to understand the project structure, how to train, test, and debug the reinforcement learning models.
+Este guia mostra como preparar o ambiente, treinar os agentes, avaliar os modelos e inspecionar os resultados do projeto RobertaIA.
 
-## 📁 Project Structure (Main Files)
+## Estrutura Principal
 
-The following lists exactly the files that form the core application, excluding temporary logs or untracked directories:
+Os arquivos centrais do projeto estão em `src/`:
 
-- **`requirements.txt`**: List of Python dependencies required to run the project. Install them using `pip install -r requirements.txt`.
-- **`src/robertaEnv.py`**: Contains `RobertaEnv-v0`, a custom Gymnasium environment. This simulates the 1D balancer problem for an arm actuated by a motor, handling step physics, reward calculation, and Pygame rendering.
-- **`src/robertaPolicy.py`**: Defines the custom PyTorch neural network `RobertaPolicy` (acting as a feature extractor) that processes the observation space for the SAC reinforcement learning algorithm.
-- **`src/model_SAC_functions.py`**: Contains key helper functions such as setting random seeds, `linear_schedule` for learning rate decay, and `create_sac` which instantiates the Stable-Baselines3 Soft Actor-Critic algorithm with custom architectural arguments.
-- **`src/training.py`**: The main entry point script to train the neural network. It provisions the vectorised environment, initiates callbacks, and executes the SAC training loop.
-- **`src/debuging.py`**: Script used for testing (evaluating) a previously trained model, visualizing the test via Pygame, and plotting the episode tracking performance.
+- `src/robertaEnv.py`: ambiente Gymnasium `RobertaEnv-v0`, com dinâmica física, estado, recompensa e renderização.
+- `src/reward_shaping.py`: função de recompensa usada pelo ambiente.
+- `src/edo_solver.py`: integrador RK4 usado na simulação da dinâmica.
+- `src/render.py`: desenho da interface com Pygame.
+- `src/stable3_aux_funcs.py`: utilitários de seed e criação de ambiente auxiliar.
+- `src/model_SAC_functions.py`: configuração do agente SAC.
+- `src/model_PPO_functions.py`: configuração do agente PPO.
+- `src/training.py`: ponto de entrada para treino.
+- `src/debuging.py`: ponto de entrada para avaliação e geração de gráficos.
 
-*(Note: Peripheral folders like `simulacao/` contain Matlab/Simulink logic used for mathematical modeling, `relatorios/` holds LaTeX reportss).*
+## 1. Preparar o Ambiente
 
----
+Como este projeto será enviado apenas com os códigos, o avaliador deve criar a virtualenv localmente e instalar as dependências a partir do `requirements.txt`:
 
-## 🚀 How to Train the Neural Network
-
-To start training the Soft Actor-Critic (SAC) model, you use the `src/training.py` script. The script prepares the environment, initializes the algorithm, and starts the learning loop using the `stable-baselines3` library.
-
-### Basic Command:
 ```bash
-python src/training.py --timesteps 10000 
+cd /home/andreassis/RobertaIA
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
 ```
 
-### Adjustable Parameters:
-- `--timesteps`: **(Required)** The total number of steps the environment will run to train the agent.
-- `--lr`: *(Optional)* Initial learning rate for the neural network optimizer. Uses a linear decaying schedule over time. Default: `0.0003` (`3e-4`).
-- `--seed`: *(Optional)* The random seed to guarantee reproducibility across the Python environment and PyTorch initializations. Default: `42`.
+Se o sistema já tiver um ambiente Python ativo, basta garantir que ele esteja apontando para a versão correta e rodar apenas:
 
----
-
-## 🧪 How to Test the Neural Network
-
-After training, test your agent to see how well it balances and track its internal angle changes per timestep. This is performed using the `src/debuging.py` script.
-
-### Basic Command:
 ```bash
-python src/debuging.py --model logs/YOUR_MODEL_DIRECTORY/SAC_Roberta_lr0.{lr}_seed{seed}.zip
+pip install -r requirements.txt
 ```
 
-### Adjustable Parameters:
-- `--model`: **(Required)** The exact path to the trained model's `.zip` file.
-- `--episodes`: *(Optional)* The number of test rounds (episodes) you would like it to play and record. Default: `10`.
+## 2. Treinar um Modelo
 
-During execution, the script will:
-1. Render the visual arm angle environment on screen.
-2. Measure the angle (`phi`) and setpoint data at each simulation step.
-3. Automatically generate and save graphical plots (Angle vs Steps) inside the folder `images_test/`, located in the same directory as your trained model.
+O treino é feito pelo `src/training.py`. O script registra automaticamente o ambiente `RobertaEnv-v0`, cria os ambientes vetorizados e salva o modelo final dentro de `logs/`.
 
----
+### SAC
 
-## 📂 Where Logs are Saved
+```bash
+python src/training.py --algorithm SAC --timesteps 1000000 --lr 0.0003 --seed 42
+```
 
-During training, all metadata, model states, and backups are written and organized inside the `logs/` directory.
+### PPO
 
-Each training run generates a unique uniquely named sub-folder:
-`logs/SAC_Roberta_lr<LR>_seed<SEED>_episodes<TIMESTEPS>_<TIMESTAMP>/`
+```bash
+python src/training.py --algorithm PPO --timesteps 1000000 --lr 0.0003 --seed 42
+```
 
-Inside this specific directory, you will likely find:
-- `SAC_Roberta_lr<...>.zip`: The final saved model upon execution end.
-- `info.json`: A snapshot of environment parameters and physical factors active during the run.
-- `/SAC_1/` / `/eval/`: Underlying folders containing the TensorBoard logging events and intermediate evaluation models (e.g. `best_model.zip`).
+### Parâmetros
 
----
+- `--algorithm`: obrigatório, escolha entre `SAC` e `PPO`.
+- `--timesteps`: obrigatório, quantidade total de passos de treino.
+- `--lr`: opcional, taxa de aprendizado inicial. Padrão: `0.0003`.
+- `--seed`: opcional, semente para reprodutibilidade. Padrão: `42`.
 
-## 📈 Debugging with TensorBoard
+### Saída do treino
 
-TensorBoard gives you a powerful visual overview of the SAC learning process, including Episode Rewards, Lengths, value losses, and entropy metrics. 
+Cada execução cria uma pasta com nome parecido com:
 
-### How to open it:
-1. Open a new terminal.
-2. Ensure you have your project's virtual environment activated (`source .venv/bin/activate`).
-3. Point TensorBoard to the root logs directory by running:
+```text
+logs/SAC/lr0.0003_seed42_episodes1000000_12-07-2026-14:49:00/
+```
+
+Dentro dela ficam:
+
+- `info.json`: parâmetros físicos e metadados do ambiente.
+- `SAC_Roberta_lr0.0003_seed42.zip` ou `PPO_Roberta_lr0.0003_seed42.zip`: modelo final salvo.
+- `best_model.zip`: melhor modelo encontrado durante a avaliação periódica.
+- arquivos do TensorBoard dentro das subpastas de log.
+
+## 3. Avaliar um Modelo Treinado
+
+Depois do treino, use `src/debuging.py` para rodar uma demonstração do modelo e gerar gráficos da evolução do ângulo.
+
+```bash
+python src/debuging.py --model logs/SAC/lr0.0003_seed42_episodes1000000_12-07-2026-14:49:00/SAC_Roberta_lr0.0003_seed42.zip --episodes 10 --device cpu
+```
+
+### Parâmetros
+
+- `--model`: obrigatório, caminho completo para o `.zip` do modelo.
+- `--episodes`: opcional, quantidade de episódios de teste. Padrão: `10`.
+- `--device`: opcional, `cpu` ou `cuda` para inferência. Padrão: `cpu`.
+
+### O que o script faz
+
+1. Abre a janela de renderização do Pygame.
+2. Executa o modelo carregado no ambiente `RobertaEnv-v0`.
+3. Registra o ângulo `phi` e o setpoint ao longo do episódio.
+4. Salva os gráficos em uma pasta `images_test/` ao lado do modelo carregado.
+
+## 4. TensorBoard
+
+Durante o treino, o projeto grava métricas em `logs/`. Para visualizar os resultados:
 
 ```bash
 tensorboard --logdir logs/
 ```
 
-4. Open your web browser and navigate to: `http://localhost:6006/`
+Depois abra `http://localhost:6006/` no navegador.
+
+## 5. Observações Importantes
+
+- Execute os comandos sempre na raiz do repositório, porque os imports usam caminhos relativos.
+- O ambiente `RobertaEnv-v0` é registrado dentro dos scripts de treino e avaliação; não é preciso registrar manualmente.
+- O treino está configurado para rodar em CPU nas funções de criação dos modelos.
+- O arquivo `requirements.txt` contém as dependências necessárias para recriar o ambiente em outra máquina.

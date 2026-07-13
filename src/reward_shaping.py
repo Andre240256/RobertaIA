@@ -1,5 +1,12 @@
+"""
+Reward shaping module for the Roberta robotic arm environment.
+It defines the weighting constants and the core logic used to calculate 
+the continuous and discrete rewards based on the agent's kinematics and actions.
+"""
+
 import numpy as np
 
+# Reward and penalty weighting constants
 PHI_WEIGHT = 5.0
 SURVIVAL_REWARD = 1.0
 PHI_DOT_WEIGHT = 1.0
@@ -17,42 +24,56 @@ def compute_reward(
     max_dangle: float,
     terminated: bool,
 ) -> float:
-    """Calcula a recompensa modelada (shaping reward) para o ambiente do braço Roberta."""
+    """
+    Calculates the shaped reward for the Roberta arm environment.
 
-    # Penalidade extrema para falha crítica (ex: ângulo do braço exceder os limites físicos permitidos).
+    Args:
+        phi (float): The current angle or position of the arm.
+        phi_dot (float): The current angular velocity of the arm.
+        setpoint (float): The target angle/position the arm needs to reach.
+        throttle (float): The current control action (motor usage) applied.
+        equilibrium (float): The baseline throttle value required to maintain a steady state.
+        max_dangle (float): The maximum allowed physical angle amplitude, used for normalization.
+        terminated (bool): Flag indicating if a critical failure occurred (episode termination).
+
+    Returns:
+        float: The computed shaped reward for the current timestep.
+    """
+
+    # Extreme penalty for critical failure (e.g., arm angle exceeding allowed physical limits).
     if terminated:
         return float(KILL_REWARD)
 
-    # Cálculo de erro usando Norma L1 (valor absoluto). 
-    # Isso garante um gradiente de correção constante, forçando o agente a corrigir 
-    # os desvios mesmo quando está milimetricamente perto do alvo.
-    # As métricas são normalizadas dividindo pelos limites máximos de amplitude (max_dangle).
+    # Error calculation using L1 Norm (absolute value). 
+    # This guarantees a constant correction gradient, forcing the agent to correct 
+    # deviations even when it is millimetrically close to the target.
+    # Metrics are normalized by dividing by the maximum amplitude limits (max_dangle).
     phi_dot_error = abs(phi_dot / (5 * max_dangle))
     phi_error = abs((phi - setpoint) / max_dangle)
     
-    # Penalidade de esforço de controle (uso do motor). 
-    # O peso reduzido (multiplicado por 0.1) garante que o agente foque na precisão  
-    # posicional (chegar ao setpoint) em vez de apenas otimizar o consumo de energia.
+    # Control effort penalty (motor usage). 
+    # The reduced weight (multiplied by 0.1) ensures the agent focuses on positional 
+    # accuracy (reaching the setpoint) rather than solely optimizing energy consumption.
     action_penalty = (ACTION_WEIGHT * 0.1) * abs(throttle - equilibrium)
     
-    # Composição principal: O agente ganha uma base constante de sobrevivência e 
-    # sofre decréscimos proporcionais aos erros de cinemática (ângulo e velocidade) 
-    # e ao esforço da ação empregada.
+    # Main composition: The agent earns a constant survival base reward and 
+    # suffers deductions proportional to kinematic errors (angle and velocity) 
+    # and the effort of the applied action. It also includes a Gaussian-like proximity bonus.
     reward = -(
         PHI_DOT_WEIGHT * phi_dot_error
         + PHI_WEIGHT * phi_error
         + action_penalty
     ) + (
-        PHI_WEIGHT_N * np.exp(-phi_error**2/LAMBDA)
+        PHI_WEIGHT_N * np.exp(-phi_error**2 / LAMBDA)
         + SURVIVAL_REWARD
     )
 
-    # Bônus de estado estacionário (Zona Alvo):
-    # Condição de recompensa superdimensionada acionada apenas quando a precisão 
-    # atinge menos de 2% de desvio, ancorando o braço no local exato do setpoint.
+    # Steady-state bonus (Target Zone):
+    # Oversized reward condition triggered only when precision reaches less than 2% deviation, 
+    # anchoring the arm to the exact setpoint location.
     if phi_error < 0.02: 
         reward += 5.0
     if phi_error < 0.005:
-        reward += 5
+        reward += 5.0
         
     return float(reward)
